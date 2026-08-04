@@ -1,0 +1,2 @@
+# voicevox_rust
+RustとVOICEVOXで色々試すリポジトリ
