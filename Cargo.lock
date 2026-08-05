@@ -1852,6 +1852,7 @@ dependencies = [
 name = "voicevox_rust"
 version = "0.1.0"
 dependencies = [
+ "const_format",
  "voicevox_core",
 ]
 
