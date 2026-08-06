@@ -1,6 +1,6 @@
-use std::{env};
+use std::{env, fs::File, io::Write};
 
-use voicevox_core::blocking::{Onnxruntime, OpenJtalk, Synthesizer, VoiceModelFile};
+use voicevox_core::{CharacterMeta, StyleMeta, blocking::{Onnxruntime, OpenJtalk, Synthesizer, VoiceModelFile}};
 
 fn main() {
     let current_exe_tree = |path: &str| {
@@ -24,5 +24,16 @@ fn main() {
     dbg!(synth.is_gpu_mode());
 
     synth.load_voice_model(&VoiceModelFile::open(vvm).unwrap()).unwrap();
-    dbg!(synth.metas());
+    let StyleMeta { id: style_id, .. } = synth
+        .metas()
+        .into_iter()
+        .filter(|CharacterMeta {name, ..}| name == "ずんだもん")
+        .flat_map(|CharacterMeta { styles, .. }| styles)
+        .find(|StyleMeta { name, ..}| name == "ノーマル").unwrap();
+
+    let wav = &synth.tts("こんにちは", style_id).perform().unwrap();
+
+    let mut file = File::create("zuda.wav").unwrap();
+    file.write_all(wav).unwrap();
+    // dbg!(wav);
 }
