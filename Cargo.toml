@@ -5,4 +5,4 @@ edition = "2024"
 
 [dependencies]
 const_format = "0.2.36"
-voicevox_core = { git = 'https://github.com/VOICEVOX/voicevox_core', features = ['load-onnxruntime'] }
+voicevox_core = { git = 'https://github.com/VOICEVOX/voicevox_core', features = ['load-onnxruntime'], tag="0.16.4"}
