@@ -1,3 +1,4 @@
+use std::io::Cursor;
 use std::rc::Rc;
 use std::{env, fs::File, io::Write};
 
@@ -9,7 +10,6 @@ use voicevox_core::{
     blocking::{Onnxruntime, OpenJtalk, Synthesizer, VoiceModelFile},
 };
 
-use crate::Message::TTSBtnPressed;
 
 const APP_NAME: &str = "VOICEVOX Rust GUI";
 
@@ -62,18 +62,12 @@ fn main() -> iced::Result {
         .find(|StyleMeta { name, .. }| name == "ノーマル")
         .unwrap();
 
-    // let wav = &synth.tts("こんにちは", style_id).perform().unwrap();
-
-    // let mut file = File::create("zuda.wav").unwrap();
-    // file.write_all(wav).unwrap();
-    // dbg!(wav);
-
     let synth = Rc::new(synth);
 
     iced::application(
         move || IcedVVGUIState::new(synth.clone(), style_id),
-        update,
-        view,
+        IcedVVGUIState::update,
+        IcedVVGUIState::view,
     )
     .theme(Theme::Dark)
     .title(APP_NAME)
@@ -84,6 +78,7 @@ fn main() -> iced::Result {
 pub enum Message {
     TextEdited(String),
     TTSBtnPressed,
+    SayBtnPressed,
 }
 
 struct IcedVVGUIState {
@@ -100,32 +95,45 @@ impl IcedVVGUIState {
             style_id,
         }
     }
-}
 
-fn update(state: &mut IcedVVGUIState, message: Message) {
-    match message {
-        Message::TextEdited(text) => {
-            state.current_text = text;
+    fn update(state: &mut IcedVVGUIState, message: Message) {
+        match message {
+            Message::TextEdited(text) => {
+                state.current_text = text;
+            }
+            Message::TTSBtnPressed => {
+                let wav = &state
+                    .synth
+                    .tts(&state.current_text, state.style_id)
+                    .perform()
+                    .unwrap();
+                let mut file = File::create(format!("zunda_{}.wav", state.current_text)).unwrap();
+                file.write_all(wav).unwrap();
+            }
+            Message::SayBtnPressed => {
+                let wav = state
+                    .synth
+                    .tts(&state.current_text, state.style_id)
+                    .perform()
+                    .unwrap();
+                let wav = Cursor::new(wav);
+                let sink_handle = rodio::DeviceSinkBuilder::open_default_sink().unwrap();
+                let player = rodio::play(sink_handle.mixer(), wav).unwrap();
+                player.sleep_until_end();
+            }
         }
-        TTSBtnPressed => {
-            let wav = &state
-                .synth
-                .tts(&state.current_text, state.style_id)
-                .perform()
-                .unwrap();
-            let mut file = File::create(format!("zunda_{}.wav", state.current_text)).unwrap();
-            file.write_all(wav).unwrap();
-        }
+    }
+
+    fn view<'a>(state: &'a IcedVVGUIState) -> Column<'a, Message> {
+        column![
+            text(format!(
+                "以下の文字列が音声合成され保存されます\n{}",
+                &state.current_text
+            )),
+            text_input("Input text...", &state.current_text).on_input(Message::TextEdited),
+            button("TTS & Save!").on_press(Message::TTSBtnPressed),
+            button("Say").on_press(Message::SayBtnPressed)
+        ]
     }
 }
 
-fn view<'a>(state: &'a IcedVVGUIState) -> Column<'a, Message> {
-    column![
-        text(format!(
-            "以下の文字列が音声合成され保存されます\n{}",
-            &state.current_text
-        )),
-        text_input("Input text...", &state.current_text).on_input(Message::TextEdited),
-        button("TTS!").on_press(Message::TTSBtnPressed)
-    ]
-}
