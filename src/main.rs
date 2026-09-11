@@ -1,5 +1,5 @@
 use std::io::Cursor;
-use std::rc::Rc;
+use std::error::Error;
 use std::{env, fs::File, io::Write};
 
 use iced::Theme;
@@ -9,7 +9,6 @@ use voicevox_core::{
     CharacterMeta, StyleMeta,
     blocking::{Onnxruntime, OpenJtalk, Synthesizer, VoiceModelFile},
 };
-
 
 const APP_NAME: &str = "VOICEVOX Rust GUI";
 
@@ -37,35 +36,8 @@ fn main() -> iced::Result {
     let ojt_dic_dir = current_exe_tree("/voicevox_core/dict/open_jtalk_dic_utf_8-1.11");
     let vvm = current_exe_tree("/voicevox_core/models/vvms/0.vvm");
 
-    let synth = {
-        let ort = Onnxruntime::load_once()
-            .filename(path_to_dylib)
-            .perform()
-            .unwrap();
-        let ojt = OpenJtalk::new(ojt_dic_dir).unwrap();
-        Synthesizer::builder(ort)
-            .text_analyzer(ojt)
-            .build()
-            .unwrap()
-    };
-
-    dbg!(synth.is_gpu_mode());
-
-    synth
-        .load_voice_model(&VoiceModelFile::open(vvm).unwrap())
-        .unwrap();
-    let StyleMeta { id: style_id, .. } = synth
-        .metas()
-        .into_iter()
-        .filter(|CharacterMeta { name, .. }| name == "ずんだもん")
-        .flat_map(|CharacterMeta { styles, .. }| styles)
-        .find(|StyleMeta { name, .. }| name == "ノーマル")
-        .unwrap();
-
-    let synth = Rc::new(synth);
-
     iced::application(
-        move || IcedVVGUIState::new(synth.clone(), style_id),
+        move || IcedVVGUIState::new(path_to_dylib.clone(), ojt_dic_dir.clone(), vvm.clone()),
         IcedVVGUIState::update,
         IcedVVGUIState::view,
     )
@@ -82,17 +54,16 @@ pub enum Message {
 }
 
 struct IcedVVGUIState {
-    synth: Rc<Synthesizer<OpenJtalk>>,
+    model_context: VVModelContext,
     current_text: String,
-    style_id: StyleId,
 }
 
 impl IcedVVGUIState {
-    fn new(synth: Rc<Synthesizer<OpenJtalk>>, style_id: StyleId) -> Self {
+    fn new(path_to_dylib: String, ojt_dic_dir: String, vvm: String) -> Self {
+        let model_context = VVModelContext::new(path_to_dylib, ojt_dic_dir, vvm).unwrap();
         Self {
-            synth,
+            model_context,
             current_text: String::default(),
-            style_id,
         }
     }
 
@@ -102,20 +73,12 @@ impl IcedVVGUIState {
                 state.current_text = text;
             }
             Message::TTSBtnPressed => {
-                let wav = &state
-                    .synth
-                    .tts(&state.current_text, state.style_id)
-                    .perform()
-                    .unwrap();
+                let wav = state.model_context.tts(&state.current_text).unwrap();
                 let mut file = File::create(format!("zunda_{}.wav", state.current_text)).unwrap();
-                file.write_all(wav).unwrap();
+                file.write_all(&wav).unwrap()
             }
             Message::SayBtnPressed => {
-                let wav = state
-                    .synth
-                    .tts(&state.current_text, state.style_id)
-                    .perform()
-                    .unwrap();
+                let wav = state.model_context.tts(&state.current_text).unwrap();
                 let wav = Cursor::new(wav);
                 let sink_handle = rodio::DeviceSinkBuilder::open_default_sink().unwrap();
                 let player = rodio::play(sink_handle.mixer(), wav).unwrap();
@@ -137,3 +100,39 @@ impl IcedVVGUIState {
     }
 }
 
+struct VVModelContext {
+    synth: Synthesizer<OpenJtalk>,
+    style_id: StyleId,
+}
+
+impl VVModelContext {
+    fn new(
+        path_to_dylib: String,
+        ojt_dic_dir: String,
+        vvm: String,
+    ) -> Result<Self, Box<dyn Error>> {
+        let synth = {
+            let ort = Onnxruntime::load_once().filename(path_to_dylib).perform()?;
+            let ojt = OpenJtalk::new(ojt_dic_dir).unwrap();
+            Synthesizer::builder(ort).text_analyzer(ojt).build()?
+        };
+
+        dbg!(synth.is_gpu_mode());
+
+        synth.load_voice_model(&VoiceModelFile::open(vvm)?)?;
+
+        let StyleMeta { id: style_id, .. } = synth
+            .metas()
+            .into_iter()
+            .filter(|CharacterMeta { name, .. }| name == "ずんだもん")
+            .flat_map(|CharacterMeta { styles, .. }| styles)
+            .find(|StyleMeta { name, .. }| name == "ノーマル")
+            .ok_or("style not found")?;
+
+        Ok(Self { synth, style_id })
+    }
+
+    fn tts(&self, text: &str) -> Result<Vec<u8>, voicevox_core::Error> {
+        self.synth.tts(text, self.style_id).perform()
+    }
+}
