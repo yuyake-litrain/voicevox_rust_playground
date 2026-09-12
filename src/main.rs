@@ -89,7 +89,12 @@ impl IcedVVGUIState {
             }
             Message::TTSBtnPressed => {
                 let wav = state.model_context.tts(&state.current_text).unwrap();
-                let mut file = File::create(format!("zunda_{}.wav", state.current_text)).unwrap();
+                let mut file = File::create(format!(
+                    "{}_{}.wav",
+                    state.current_character.as_ref().ok_or("").unwrap().name,
+                    state.current_text
+                ))
+                .unwrap();
                 file.write_all(&wav).unwrap()
             }
             Message::SayBtnPressed => {
@@ -267,9 +272,8 @@ impl VVModelContext {
             .ok_or("Style is not Specified!")?;
 
         let file = &Arc::clone(&current_style.vvm_ref);
-        if !self.synth.is_loaded_voice_model(file.id()){
-            self.synth
-                .load_voice_model(file)?;
+        if !self.synth.is_loaded_voice_model(file.id()) {
+            self.synth.load_voice_model(file)?;
         }
 
         let StyleMeta { id: style_id, .. } = self
