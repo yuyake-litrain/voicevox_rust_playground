@@ -5,10 +5,12 @@ edition = "2024"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
+anyhow = "1.0.104"
 const_format = "0.2.36"
 iced = "0.14.0"
 iced_aw = "0.14.1"
 reqwest = "0.13.5"
 rodio = "0.22.2"
+thiserror = "2.0.20"
 tokio = { version="1.53.1", features=["full"] }
 voicevox_core = { git = 'https://github.com/VOICEVOX/voicevox_core', features = ['load-onnxruntime'], tag="0.16.4"}

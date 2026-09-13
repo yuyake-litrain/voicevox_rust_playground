@@ -16,7 +16,7 @@ use voicevox_core::{
     blocking::{Onnxruntime, OpenJtalk, Synthesizer, VoiceModelFile},
 };
 
-const APP_NAME: &str = "VOICEVOX Rust GUI";
+const APP_NAME: &str = "VVRustGUI";
 
 fn current_exe_tree(path: &str) -> String {
     format!(
