@@ -96,7 +96,7 @@ impl IcedVVGUIState {
             // 線
             container("")
                 .width(Length::Fill)
-                .height(2.0)
+                .height(1.0)
                 .style(|_| container::Style {
                     background: Some(Background::Color(color!(0x444444))),
                     ..Default::default()
