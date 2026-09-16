@@ -5711,6 +5711,7 @@ dependencies = [
  "iced_aw",
  "reqwest",
  "rodio",
+ "slotmap",
  "thiserror 2.0.20",
  "tokio",
  "voicevox_core",

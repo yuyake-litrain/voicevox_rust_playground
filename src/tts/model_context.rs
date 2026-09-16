@@ -32,7 +32,6 @@ fn current_exe_tree(path: &str) -> String {
 
 impl VVModelContext {
     pub fn new(path_to_dylib: String, ojt_dic_dir: String) -> Result<Self, Box<dyn Error>> {
-        // let vvm = current_exe_tree("/voicevox_core/models/vvms/0.vvm");
 
         let vvm_files = {
             let dir_reader = fs::read_dir(current_exe_tree("/voicevox_core/models/vvms"))?

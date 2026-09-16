@@ -1,17 +1,8 @@
-use std::sync::Arc;
 use std::fmt::Display;
+use std::sync::Arc;
 
 use voicevox_core::StyleId;
-use voicevox_core::{
-    blocking::{OpenJtalk, Synthesizer, VoiceModelFile},
-};
-
-pub struct VVModelContext {
-    pub synth: Synthesizer<OpenJtalk>,
-    pub current_style: Option<CharacterStyle>,
-    pub current_character: Option<Character>,
-    pub characters: Vec<Character>,
-}
+use voicevox_core::blocking::VoiceModelFile;
 
 #[derive(Debug, Clone)]
 pub struct Character {
@@ -37,4 +28,3 @@ impl Display for CharacterStyle {
         write!(f, "{}", self.name)
     }
 }
-
