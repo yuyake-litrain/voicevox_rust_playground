@@ -1,5 +1,7 @@
 use crate::Character;
 use crate::CharacterStyle;
+use slotmap::SecondaryMap;
+use slotmap::{SlotMap, new_key_type};
 use std::error::Error;
 use std::fs::{self};
 use std::sync::Arc;
@@ -10,11 +12,20 @@ use voicevox_core::{
     blocking::{Onnxruntime, OpenJtalk, Synthesizer, VoiceModelFile},
 };
 
+new_key_type! {
+    pub struct CharacterKey;
+    pub struct StyleKey;
+}
+
 pub struct VVModelContext {
     pub synth: Synthesizer<OpenJtalk>,
     pub current_style: Option<CharacterStyle>,
     pub current_character: Option<Character>,
     pub characters: Vec<Character>,
+    pub current_character_key: Option<CharacterKey>,
+    pub current_style_key: Option<StyleKey>,
+    pub characters_slotmap: SlotMap<CharacterKey, Character>,
+    pub styles_slotmap: SecondaryMap<CharacterKey, SlotMap<StyleKey, CharacterStyle>>,
 }
 
 fn current_exe_tree(path: &str) -> String {
@@ -32,7 +43,6 @@ fn current_exe_tree(path: &str) -> String {
 
 impl VVModelContext {
     pub fn new(path_to_dylib: String, ojt_dic_dir: String) -> Result<Self, Box<dyn Error>> {
-
         let vvm_files = {
             let dir_reader = fs::read_dir(current_exe_tree("/voicevox_core/models/vvms"))?
                 .collect::<Result<Vec<_>, _>>()?;
@@ -62,7 +72,11 @@ impl VVModelContext {
                 .build()?
         };
 
-        let characters: Vec<Character> = {
+        let mut characters: SlotMap<CharacterKey, Character> = SlotMap::with_key();
+        let mut character_styles: SecondaryMap<CharacterKey, SlotMap<StyleKey, CharacterStyle>> =
+            SecondaryMap::new();
+
+        let characters_vec: Vec<Character> = {
             let mut characters: Vec<Character> = vec![];
             for vvm in &vvms {
                 for meta in vvm.metas() {
@@ -102,13 +116,26 @@ impl VVModelContext {
             characters
         };
 
+        for c in characters_vec.clone() {
+            let k = characters.insert(c.clone());
+            let mut styles_slotmap = SlotMap::<StyleKey, CharacterStyle>::with_key();
+            for s in c.styles {
+                styles_slotmap.insert(s);
+            }
+            character_styles.insert(k, styles_slotmap);
+        }
+
         dbg!(synth.is_gpu_mode());
 
         Ok(Self {
             synth,
             current_style: None,
             current_character: None,
-            characters,
+            current_style_key: None,
+            current_character_key: None,
+            characters: characters_vec,
+            styles_slotmap: character_styles,
+            characters_slotmap: characters,
         })
     }
 
@@ -143,5 +170,35 @@ impl VVModelContext {
             .ok_or("style not found")?;
 
         Ok(self.synth.tts(text, style_id).perform()?)
+    }
+
+    pub fn get_characters_indicators(&self) -> Vec<(CharacterKey, &str)> {
+        self.characters_slotmap
+            .keys()
+            .map(|k| (k, self.get_character_name(k)))
+            .collect()
+    }
+
+    pub fn get_character_name(&self, key: CharacterKey) -> &str {
+        self.characters_slotmap.get(key).unwrap().name.as_str()
+    }
+
+    pub fn get_style_name(&self, key: StyleKey) -> &str {
+        self.styles_slotmap
+            .get(self.current_character_key.ok_or("").unwrap())
+            .unwrap()
+            .get(key)
+            .unwrap()
+            .name
+            .as_str()
+    }
+
+    pub fn get_current_styles_indicators(&self) -> Vec<(StyleKey, &str)> {
+        self.styles_slotmap
+            .get(self.current_character_key.ok_or("").unwrap())
+            .unwrap()
+            .keys()
+            .map(|k| (k, self.get_style_name(k)))
+            .collect()
     }
 }

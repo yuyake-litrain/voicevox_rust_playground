@@ -67,6 +67,7 @@ impl IcedVVGUIState {
             }
             Message::SayBtnPressed => {
                 let wav = state.model_context.tts(&state.current_text).unwrap();
+                dbg!(state.model_context.get_characters_indicators());
                 let wav = Cursor::new(wav);
                 let sink_handle = rodio::DeviceSinkBuilder::open_default_sink().unwrap();
                 let player = rodio::play(sink_handle.mixer(), wav).unwrap();
